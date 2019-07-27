@@ -1,0 +1,121 @@
+---
+title: "Constructing an Efficient Frontier in R"
+output: html_notebook
+---
+
+
+Based on this tutorial:
+https://moderndata.plot.ly/portfolio-optimization-using-r-and-plotly/
+
+Start out by loading some useful libraries:
+
+```{r}
+library(quantmod)
+library(zoo)
+library(PerformanceAnalytics)
+library(PortfolioAnalytics)
+```
+
+```{r}
+
+tickers <- c("SHV", # UST <1
+             "SHY", # UST 1-3
+             "IEI", # UST 3-7
+             "IEF", # UST 7-10
+             "TLH", # UST 10-20
+             "TLT", # UST 20+
+             "TIP", # US TIPS
+             "MBB", # Mortgage-Backed Securities
+             "LQD", # IG Corporate Debt
+             "HYG", # HY Corporate Debt
+             "EMB", # EM Debt
+             "PFF", # Preferred Equity
+             "IVV", # S&P500
+             "IEFA",# MSCI EAFE
+             "EFA") # MSCI EM
+
+getSymbols(tickers) # quantmod
+
+```
+
+This code gets us the returns vector and covariance matrix we need to optimize:
+
+```{r}
+
+prices.data <- merge.zoo(SHV[, 6],
+                         SHY[, 6],
+                         IEI[, 6],
+                         IEF[, 6],
+                         TLH[, 6],
+                         TLT[, 6],
+                         TIP[, 6],
+                         MBB[, 6],
+                         LQD[, 6],
+                         HYG[, 6],
+                         EMB[, 6],
+                         PFF[, 6],
+                         IVV[, 6],
+                         IEFA[, 6],
+                         EFA[, 6])
+
+returns.data <- CalculateReturns(prices.data) # PerformanceAnalytics
+returns.data <- na.omit(returns.data)
+colnames(returns.data) <- tickers
+
+meanReturns <- colMeans(returns.data)
+covMat <- cov(returns.data)
+```
+
+```{r}
+
+port <- portfolio.spec(assets = tickers) # PortfolioAnalytics
+
+port <- add.constraint(port, type = "box", min = 0.05, max = 0.8)
+port <- add.constraint(port, type = "full_investment")
+
+rportfolios <- random_portfolios(port, permutations = 500000, 
+                                 rp_method = "sample")
+
+```
+
+```{r}
+
+# Generate random portfolios
+rportfolios <- random_portfolios(port, permutations = 5, 
+                                 rp_method = "sample")
+
+# Get minimum variance portfolio
+minvar.port <- add.objective(port, type = "risk", name = "var")
+ 
+# Optimize
+minvar.opt <- optimize.portfolio(returns.data, minvar.port, 
+                                 optimize_method = "random", 
+                                 rp = rportfolios)
+ 
+# Generate maximum return portfolio
+maxret.port <- add.objective(port, type = "return", name = "mean")
+ 
+# Optimize
+maxret.opt <- optimize.portfolio(returns.data, maxret.port, 
+                                 optimize_method = "random", 
+                                 rp = rportfolios)
+ 
+# Generate vector of returns
+minret <- 0.06/100
+maxret <- maxret.opt$weights %*% meanReturns
+ 
+vec <- seq(minret, maxret, length.out = 100)
+```
+
+
+
+
+
+
+
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
